@@ -33,7 +33,7 @@ public class TouchImageViewSample extends ImageView {
     Matrix matrix = new Matrix();
     Matrix savedMatrix = new Matrix();
     private static final Matrix IDENTITY = new Matrix();
-    private final RectF tempRect = new RectF();
+    private final RectF imageRect = new RectF();
     // We can be in one of these 3 states
     static final int NONE = 0;
     static final int DRAG = 1;
@@ -218,22 +218,19 @@ public class TouchImageViewSample extends ImageView {
         matrix.postScale(mScaleFactor, mScaleFactor, centerViewX, centerViewY);
         setImageMatrix(matrix);
         savedMatrix.set(matrix);
-        tempRect.set(0, 0, width, height);
-        matrix.mapRect(tempRect);
+        imageRect.set(0, 0, width, height);
+        matrix.mapRect(imageRect);
         mMinScale = mScaleFactor;
-        Log.d(TAG, "Rect: " + tempRect.toShortString());
+        Log.d(TAG, "Rect: " + imageRect.toShortString());
     }
 
     private class ScaleListener extends
             ScaleGestureDetector.SimpleOnScaleGestureListener {
 
-        private float x, y;
         private float width, height;
-        private float initialScale;
         private float[] focusPoint = new float[2];
         private float[] pivotPoint = new float[2];
         private float[] anchorPoint = new float[2];
-        boolean isFirst;
         float newScale;
         @Override
         public boolean onScale(ScaleGestureDetector detector) {
@@ -243,27 +240,20 @@ public class TouchImageViewSample extends ImageView {
             focusPoint[0] = detector.getFocusX();
             focusPoint[1] = detector.getFocusY();
 
-            matrix.mapPoints(pivotPoint, anchorPoint);
-            Log.d(TAG, "------------------------------------------");
-            Log.d(TAG, "scale " + mScaleFactor + " det " + detector.getScaleFactor());
-            Log.d(TAG, "fX " + focusPoint[0] + " fY " + focusPoint[1]);
-            Log.d(TAG, "mapX " + pivotPoint[0] + " mapY " + pivotPoint[1]);
             if (newScale >= mMinScale) {
                 mScaleFactor = newScale;
             } else {
                 currentScale = mMinScale / mScaleFactor;
                 mScaleFactor = mMinScale;
             }
+            matrix.postTranslate(anchorPoint[0] - pivotPoint[0], anchorPoint[1] - pivotPoint[1]);
+            pivotPoint[0] = focusPoint[0];
+            pivotPoint[1] = focusPoint[1];
             matrix.postScale(currentScale, currentScale, anchorPoint[0], anchorPoint[1]);
+            matrix.postTranslate(focusPoint[0] - anchorPoint[0], focusPoint[1] - anchorPoint[1]);
             setImageMatrix(matrix);
-            tempRect.set(0, 0, width, height);
-            matrix.mapRect(tempRect);
-            Log.d(TAG, "Rect: " + tempRect.toShortString());
-            //matrix.reset();
-            //pivotPointX = width * mScaleFactor / 2;
-            //pivotPointY = height * mScaleFactor / 2;
-            //matrix.postTranslate(pivotPointX - width / 2, height / 2 - pivotPointY);
-
+            imageRect.set(0, 0, width, height);
+            matrix.mapRect(imageRect);
             return true;
         }
 
@@ -274,12 +264,10 @@ public class TouchImageViewSample extends ImageView {
             }
             anchorPoint[0] = detector.getFocusX();
             anchorPoint[1] = detector.getFocusY();
+            pivotPoint[0] = anchorPoint[0];
+            pivotPoint[1] = anchorPoint[1];
             width = getDrawable().getIntrinsicWidth();
             height = getDrawable().getIntrinsicHeight();
-            initialScale = mScaleFactor;
-            isFirst = true;
-            Log.d(TAG, "det " + detector.getScaleFactor());
-            Log.d(TAG, "x " + x + " y " + y);
             return super.onScaleBegin(detector);
         }
     }
