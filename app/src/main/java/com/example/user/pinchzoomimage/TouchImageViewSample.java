@@ -34,6 +34,7 @@ public class TouchImageViewSample extends ImageView {
     Matrix savedMatrix = new Matrix();
     private static final Matrix IDENTITY = new Matrix();
     private final RectF imageRect = new RectF();
+    private final RectF tempRect = new RectF();
     // We can be in one of these 3 states
     static final int NONE = 0;
     static final int DRAG = 1;
@@ -231,7 +232,8 @@ public class TouchImageViewSample extends ImageView {
         private float[] focusPoint = new float[2];
         private float[] pivotPoint = new float[2];
         private float[] anchorPoint = new float[2];
-        float newScale;
+        private float newScale;
+        private float xShift, yShift;
         @Override
         public boolean onScale(ScaleGestureDetector detector) {
             float currentScale = detector.getScaleFactor();
@@ -251,9 +253,25 @@ public class TouchImageViewSample extends ImageView {
             pivotPoint[1] = focusPoint[1];
             matrix.postScale(currentScale, currentScale, anchorPoint[0], anchorPoint[1]);
             matrix.postTranslate(focusPoint[0] - anchorPoint[0], focusPoint[1] - anchorPoint[1]);
+            tempRect.set(0, 0, width, height);
+            matrix.mapRect(tempRect);
+            if (tempRect.left > 0) {
+                xShift = -tempRect.left;
+            } else if (tempRect.right < getWidth()) {
+                xShift = getWidth() - tempRect.right;
+            }
+            if (tempRect.top > 0) {
+                yShift = -tempRect.top;
+            } else if (tempRect.bottom < getHeight()) {
+                yShift = getHeight() - tempRect.bottom;
+            }
+            matrix.postTranslate(xShift, yShift);
+            pivotPoint[0] += xShift;
+            pivotPoint[1] += yShift;
             setImageMatrix(matrix);
             imageRect.set(0, 0, width, height);
             matrix.mapRect(imageRect);
+            Log.d(TAG, imageRect.toShortString());
             return true;
         }
 
