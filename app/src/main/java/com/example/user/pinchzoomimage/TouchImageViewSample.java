@@ -62,6 +62,7 @@ public class TouchImageViewSample extends ImageView {
 
     private ScaleGestureDetector mScaleDetector;
     private float mScaleFactor = 1.f;
+    private float mMinScale = 1.f;
 
     // Existing code ...
     public TouchImageViewSample(Context context, AttributeSet attrs, int defStyle) {
@@ -205,16 +206,21 @@ public class TouchImageViewSample extends ImageView {
         mLastTouchY = mPosY = 0;
 
         mScaleFactor = Math.max(w / (float) width, h / (float) height);
-        pivotPointX = width * mScaleFactor / 2;
-        pivotPointY = height * mScaleFactor / 2;
-
+        pivotPointX = (2 * w - width * mScaleFactor) / 2;
+        pivotPointY = (2 * h - height * mScaleFactor) / 2;
+        float centerViewX = w / 2;
+        float centerViewY = h / 2;
+        float centerImageX = width / 2;
+        float centerImageY = height / 2;
         // TODO scale to pre-set rect or to crop
-        matrix.set(IDENTITY);
-        matrix.postTranslate(pivotPointX - width / 2, height / 2 - pivotPointY);
-        matrix.postScale(mScaleFactor, mScaleFactor, pivotPointX, pivotPointY);
+        matrix.reset();
+        matrix.postTranslate(centerViewX - centerImageX, centerViewY - centerImageY);
+        matrix.postScale(mScaleFactor, mScaleFactor, centerViewX, centerViewY);
         setImageMatrix(matrix);
+        savedMatrix.set(matrix);
         tempRect.set(0, 0, width, height);
         matrix.mapRect(tempRect);
+        mMinScale = mScaleFactor;
         Log.d(TAG, "Rect: " + tempRect.toShortString());
     }
 
@@ -226,41 +232,51 @@ public class TouchImageViewSample extends ImageView {
         private float initialScale;
         private float[] focusPoint = new float[2];
         private float[] pivotPoint = new float[2];
-        private float xShift, yShift;
+        private float[] anchorPoint = new float[2];
         boolean isFirst;
+        float newScale;
         @Override
         public boolean onScale(ScaleGestureDetector detector) {
-            mScaleFactor *= detector.getScaleFactor();
+            float currentScale = detector.getScaleFactor();
+            newScale = mScaleFactor * currentScale;
 
             focusPoint[0] = detector.getFocusX();
             focusPoint[1] = detector.getFocusY();
 
-            xShift = (focusPoint[0] - xShift) * detector.getScaleFactor();
-            yShift = (focusPoint[1] - yShift) * detector.getScaleFactor();
-
-            matrix.mapPoints(pivotPoint, focusPoint);
-            if (isFirst) {
-                Log.d(TAG, "scale " + mScaleFactor + " det " + detector.getScaleFactor());
-                Log.d(TAG, "fX " + focusPoint[0] + " fY " + focusPoint[1]);
-                Log.d(TAG, "mapX " + pivotPoint[0] + " mapY " + pivotPoint[1]);
-                isFirst = false;
+            matrix.mapPoints(pivotPoint, anchorPoint);
+            Log.d(TAG, "------------------------------------------");
+            Log.d(TAG, "scale " + mScaleFactor + " det " + detector.getScaleFactor());
+            Log.d(TAG, "fX " + focusPoint[0] + " fY " + focusPoint[1]);
+            Log.d(TAG, "mapX " + pivotPoint[0] + " mapY " + pivotPoint[1]);
+            if (newScale >= mMinScale) {
+                mScaleFactor = newScale;
+            } else {
+                currentScale = mMinScale / mScaleFactor;
+                mScaleFactor = mMinScale;
             }
-            //mScaleFactor = Math.max(0.05f, mScaleFactor);
+            matrix.postScale(currentScale, currentScale, anchorPoint[0], anchorPoint[1]);
+            setImageMatrix(matrix);
+            tempRect.set(0, 0, width, height);
+            matrix.mapRect(tempRect);
+            Log.d(TAG, "Rect: " + tempRect.toShortString());
             //matrix.reset();
-            //pivotPointX = pivotPoint[0] - pivotPointX;
-            //pivotPointY = pivotPoint[1];
+            //pivotPointX = width * mScaleFactor / 2;
+            //pivotPointY = height * mScaleFactor / 2;
             //matrix.postTranslate(pivotPointX - width / 2, height / 2 - pivotPointY);
-            //matrix.postScale(mScaleFactor, mScaleFactor, pivotPointX, pivotPointY);
-            //setImageMatrix(matrix);
+
             return true;
         }
 
         @Override
         public boolean onScaleBegin(ScaleGestureDetector detector) {
-            x = detector.getFocusX();
-            y = detector.getFocusY();
+            if (getDrawable() == null) {
+                return false;
+            }
+            anchorPoint[0] = detector.getFocusX();
+            anchorPoint[1] = detector.getFocusY();
+            width = getDrawable().getIntrinsicWidth();
+            height = getDrawable().getIntrinsicHeight();
             initialScale = mScaleFactor;
-            savedMatrix.set(matrix);
             isFirst = true;
             Log.d(TAG, "det " + detector.getScaleFactor());
             Log.d(TAG, "x " + x + " y " + y);
@@ -272,4 +288,5 @@ public class TouchImageViewSample extends ImageView {
         Resources r = context.getResources();
         return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, r.getDisplayMetrics());
     }
+
 }
