@@ -2,7 +2,10 @@ package com.example.user.pinchzoomimage;
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
@@ -25,9 +28,11 @@ public class TouchImageViewSample extends ImageView {
 
     // These matrices will be used to move and zoom image
     Matrix matrix = new Matrix();
-    Matrix savedMatrix = new Matrix();
     private final RectF imageRect = new RectF();
     private final RectF tempRect = new RectF();
+
+    private RectF cropRect;
+    private RectF cropImageRect;
 
     // Remember some things for zooming
     PointF start = new PointF();
@@ -85,8 +90,6 @@ public class TouchImageViewSample extends ImageView {
                 }
                 matrix.postTranslate(xShift, yShift);
                 setImageMatrix(matrix);
-                imageRect.set(0, 0, getDrawable().getIntrinsicWidth(), getDrawable().getIntrinsicHeight());
-                matrix.mapRect(imageRect);
                 break;
             default:
                 start.set(event.getX(), event.getY());
@@ -123,7 +126,16 @@ public class TouchImageViewSample extends ImageView {
 
     @Override
     public void setImageDrawable(Drawable drawable) {
-        // Constrain to given size but keep aspect ratio
+        setImageDrawable(drawable, null, null);
+    }
+
+    /**
+     * @param cropRect relative rect RectF(0f, 0f, 1f, 1f)
+     * @param cropImageRect relative rect RectF(0f, 0f, 1f, 1f)
+     */
+    public void setImageDrawable(Drawable drawable, RectF cropRect, RectF cropImageRect) {
+        this.cropRect = cropRect;
+        this.cropImageRect = cropImageRect;
         setUpMatrix(drawable, getWidth(), getHeight());
         super.setImageDrawable(drawable);
     }
@@ -135,26 +147,66 @@ public class TouchImageViewSample extends ImageView {
     }
 
     private void setUpMatrix(Drawable drawable, int w, int h) {
-        if (drawable == null) {
+        if (drawable == null || w == 0 || h == 0) {
             return;
         }
         int width = drawable.getIntrinsicWidth();
         int height = drawable.getIntrinsicHeight();
 
-        mScaleFactor = Math.max(w / (float) width, h / (float) height);
-        float centerViewX = w / 2;
-        float centerViewY = h / 2;
-        float centerImageX = width / 2;
-        float centerImageY = height / 2;
-        // TODO scale to pre-set rect or to crop
-        matrix.reset();
-        matrix.postTranslate(centerViewX - centerImageX, centerViewY - centerImageY);
-        matrix.postScale(mScaleFactor, mScaleFactor, centerViewX, centerViewY);
-        setImageMatrix(matrix);
-        savedMatrix.set(matrix);
+        mMinScale = Math.max(w / (float) width, h / (float) height);
+        if (cropRect == null || cropImageRect == null) {
+            mScaleFactor = mMinScale;
+            float centerViewX = w / 2;
+            float centerViewY = h / 2;
+            float centerImageX = width / 2;
+            float centerImageY = height / 2;
+            matrix.reset();
+            matrix.postTranslate(centerViewX - centerImageX, centerViewY - centerImageY);
+            matrix.postScale(mScaleFactor, mScaleFactor, centerViewX, centerViewY);
+            setImageMatrix(matrix);
+        } else {
+            mScaleFactor = Math.max(cropRect.width() * w / cropImageRect.width(), cropRect.height() * h / cropImageRect.height());
+            float centerViewX = cropRect.centerX() * w;
+            float centerViewY = cropRect.centerY() * h;
+            float centerImageX = cropImageRect.centerX();
+            float centerImageY = cropImageRect.centerY();
+            matrix.reset();
+            Log.d(TAG, String.format("scale %f, cvX %f, cvY %f, ciX %f, cyY %f",
+                    mScaleFactor, centerViewX, centerViewY, centerImageX, centerImageY));
+            matrix.postTranslate(centerViewX - centerImageX, centerViewY - centerImageY);
+            matrix.postScale(mScaleFactor, mScaleFactor, centerViewX, centerViewY);
+            setImageMatrix(matrix);
+        }
+    }
+
+    private static final Paint testPaint = new Paint();
+    static {
+        testPaint.setColor(Color.GREEN);
+        testPaint.setStrokeWidth(3);
+        testPaint.setStyle(Paint.Style.STROKE);
+    }
+
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+        super.dispatchDraw(canvas);
+        if (cropImageRect != null) {
+            matrix.mapRect(tempRect, cropImageRect);
+            Log.d(TAG, tempRect.toShortString());
+            canvas.drawRect(tempRect, testPaint);
+        }
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+
+    }
+
+    private void refreshImageRect() {
+        int width = (getDrawable() != null) ? getDrawable().getIntrinsicWidth() : 0;
+        int height = (getDrawable() != null) ? getDrawable().getIntrinsicHeight() : 0;
         imageRect.set(0, 0, width, height);
         matrix.mapRect(imageRect);
-        mMinScale = mScaleFactor;
     }
 
     private class ScaleListener extends
