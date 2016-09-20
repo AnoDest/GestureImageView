@@ -171,9 +171,12 @@ public class TouchImageViewSample extends ImageView {
             float centerImageX = cropImageRect.centerX();
             float centerImageY = cropImageRect.centerY();
             matrix.reset();
+            //Log.d(TAG, String.format("iRatio %f, w %d, h %d",
+            //        cropImageRect.width() / cropImageRect.height(), w, h));
             Log.d(TAG, String.format("scale %f, cvX %f, cvY %f, ciX %f, cyY %f",
                     mScaleFactor, centerViewX, centerViewY, centerImageX, centerImageY));
             matrix.postTranslate(centerViewX - centerImageX, centerViewY - centerImageY);
+            //mScaleFactor = Math.max(mMinScale, mScaleFactor);
             matrix.postScale(mScaleFactor, mScaleFactor, centerViewX, centerViewY);
             setImageMatrix(matrix);
         }
@@ -192,7 +195,13 @@ public class TouchImageViewSample extends ImageView {
         if (cropImageRect != null) {
             matrix.mapRect(tempRect, cropImageRect);
             Log.d(TAG, tempRect.toShortString());
+            testPaint.setColor(Color.BLUE);
             canvas.drawRect(tempRect, testPaint);
+            testPaint.setColor(Color.GREEN);
+            canvas.drawRect(cropRect.left * getWidth(), cropRect.top * getHeight(),
+                    cropRect.right * getWidth(), cropRect.bottom * getHeight(), testPaint);
+            testPaint.setColor(Color.RED);
+            canvas.drawRect(0, 0, getWidth(), getHeight(), testPaint);
         }
     }
 
