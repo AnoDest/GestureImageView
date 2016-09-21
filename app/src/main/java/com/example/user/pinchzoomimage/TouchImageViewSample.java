@@ -31,7 +31,8 @@ public class TouchImageViewSample extends ImageView {
     private final RectF imageRect = new RectF();
     private final RectF tempRect = new RectF();
 
-    private RectF cropRect;
+    private RectF cropRectRel;
+    private RectF cropRect = new RectF();
     private RectF cropImageRect;
 
     // Remember some things for zooming
@@ -78,15 +79,15 @@ public class TouchImageViewSample extends ImageView {
                 tempRect.set(0, 0, getDrawable().getIntrinsicWidth(), getDrawable().getIntrinsicHeight());
                 matrix.mapRect(tempRect);
                 float xShift = 0, yShift = 0;
-                if (tempRect.left > 0) {
-                    xShift = -tempRect.left;
-                } else if (tempRect.right < getWidth()) {
-                    xShift = getWidth() - tempRect.right;
+                if (tempRect.left > cropRect.left) {
+                    xShift = cropRect.left - tempRect.left;
+                } else if (tempRect.right < cropRect.right) {
+                    xShift = cropRect.right - tempRect.right;
                 }
-                if (tempRect.top > 0) {
-                    yShift = -tempRect.top;
-                } else if (tempRect.bottom < getHeight()) {
-                    yShift = getHeight() - tempRect.bottom;
+                if (tempRect.top > cropRect.top) {
+                    yShift = cropRect.top - tempRect.top;
+                } else if (tempRect.bottom < cropRect.bottom) {
+                    yShift = cropRect.bottom - tempRect.bottom;
                 }
                 matrix.postTranslate(xShift, yShift);
                 setImageMatrix(matrix);
@@ -134,7 +135,7 @@ public class TouchImageViewSample extends ImageView {
      * @param cropImageRect relative rect RectF(0f, 0f, 1f, 1f)
      */
     public void setImageDrawable(Drawable drawable, RectF cropRect, RectF cropImageRect) {
-        this.cropRect = cropRect;
+        this.cropRectRel = cropRect;
         this.cropImageRect = cropImageRect;
         setUpMatrix(drawable, getWidth(), getHeight());
         super.setImageDrawable(drawable);
@@ -153,8 +154,7 @@ public class TouchImageViewSample extends ImageView {
         int width = drawable.getIntrinsicWidth();
         int height = drawable.getIntrinsicHeight();
 
-        mMinScale = Math.max(w / (float) width, h / (float) height);
-        if (cropRect == null || cropImageRect == null) {
+        if (cropRectRel == null) {
             mScaleFactor = mMinScale;
             float centerViewX = w / 2;
             float centerViewY = h / 2;
@@ -163,11 +163,17 @@ public class TouchImageViewSample extends ImageView {
             matrix.reset();
             matrix.postTranslate(centerViewX - centerImageX, centerViewY - centerImageY);
             matrix.postScale(mScaleFactor, mScaleFactor, centerViewX, centerViewY);
+            cropRect.set(0, 0, w, h);
             setImageMatrix(matrix);
         } else {
-            mScaleFactor = Math.max(cropRect.width() * w / cropImageRect.width(), cropRect.height() * h / cropImageRect.height());
-            float centerViewX = cropRect.centerX() * w;
-            float centerViewY = cropRect.centerY() * h;
+            float baseViewSize = Math.min(w, h);
+            cropRect.set((w - cropRectRel.width() * baseViewSize) / 2,
+                    (h - cropRectRel.height() * baseViewSize) / 2,
+                    (w + cropRectRel.width() * baseViewSize) / 2,
+                    (h + cropRectRel.height() * baseViewSize) / 2);
+            mScaleFactor = Math.max(cropRect.width() / cropImageRect.width(), cropRect.height() / cropImageRect.height());
+            float centerViewX = cropRect.centerX();
+            float centerViewY = cropRect.centerY();
             float centerImageX = cropImageRect.centerX();
             float centerImageY = cropImageRect.centerY();
             matrix.reset();
@@ -176,10 +182,10 @@ public class TouchImageViewSample extends ImageView {
             Log.d(TAG, String.format("scale %f, cvX %f, cvY %f, ciX %f, cyY %f",
                     mScaleFactor, centerViewX, centerViewY, centerImageX, centerImageY));
             matrix.postTranslate(centerViewX - centerImageX, centerViewY - centerImageY);
-            //mScaleFactor = Math.max(mMinScale, mScaleFactor);
             matrix.postScale(mScaleFactor, mScaleFactor, centerViewX, centerViewY);
             setImageMatrix(matrix);
         }
+        mMinScale = Math.max(cropRect.width() / (float) width, cropRect.height() / (float) height);
     }
 
     private static final Paint testPaint = new Paint();
@@ -190,25 +196,17 @@ public class TouchImageViewSample extends ImageView {
     }
 
     @Override
-    protected void dispatchDraw(Canvas canvas) {
-        super.dispatchDraw(canvas);
-        if (cropImageRect != null) {
-            matrix.mapRect(tempRect, cropImageRect);
-            Log.d(TAG, tempRect.toShortString());
-            testPaint.setColor(Color.BLUE);
-            canvas.drawRect(tempRect, testPaint);
-            testPaint.setColor(Color.GREEN);
-            canvas.drawRect(cropRect.left * getWidth(), cropRect.top * getHeight(),
-                    cropRect.right * getWidth(), cropRect.bottom * getHeight(), testPaint);
-            testPaint.setColor(Color.RED);
-            canvas.drawRect(0, 0, getWidth(), getHeight(), testPaint);
-        }
-    }
-
-    @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-
+        if (cropImageRect != null) {
+            matrix.mapRect(tempRect, cropImageRect);
+            testPaint.setColor(Color.BLUE);
+            canvas.drawRect(tempRect, testPaint);
+        }
+        testPaint.setColor(Color.GREEN);
+        canvas.drawRect(cropRect, testPaint);
+        testPaint.setColor(Color.RED);
+        canvas.drawRect(0, 0, getWidth(), getHeight(), testPaint);
     }
 
     private void refreshImageRect() {
@@ -248,15 +246,15 @@ public class TouchImageViewSample extends ImageView {
             matrix.postTranslate(focusPoint[0] - anchorPoint[0], focusPoint[1] - anchorPoint[1]);
             tempRect.set(0, 0, width, height);
             matrix.mapRect(tempRect);
-            if (tempRect.left > 0) {
-                xShift = -tempRect.left;
-            } else if (tempRect.right < getWidth()) {
-                xShift = getWidth() - tempRect.right;
+            if (tempRect.left > cropRect.left) {
+                xShift = cropRect.left - tempRect.left;
+            } else if (tempRect.right < cropRect.right) {
+                xShift = cropRect.right - tempRect.right;
             }
-            if (tempRect.top > 0) {
-                yShift = -tempRect.top;
-            } else if (tempRect.bottom < getHeight()) {
-                yShift = getHeight() - tempRect.bottom;
+            if (tempRect.top > cropRect.top) {
+                yShift = cropRect.top - tempRect.top;
+            } else if (tempRect.bottom < cropRect.bottom) {
+                yShift = cropRect.bottom - tempRect.bottom;
             }
             matrix.postTranslate(xShift, yShift);
             pivotPoint[0] += xShift;
