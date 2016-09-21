@@ -155,7 +155,7 @@ public class TouchImageViewSample extends ImageView {
         int height = drawable.getIntrinsicHeight();
 
         if (cropRectRel == null) {
-            mScaleFactor = mMinScale;
+            mScaleFactor = Math.max(w / (float) width, h / (float) height);
             float centerViewX = w / 2;
             float centerViewY = h / 2;
             float centerImageX = width / 2;
@@ -166,6 +166,9 @@ public class TouchImageViewSample extends ImageView {
             cropRect.set(0, 0, w, h);
             setImageMatrix(matrix);
         } else {
+            if (cropImageRect == null) {
+                cropImageRect = new RectF(0, 0, width, height);
+            }
             float baseViewSize = Math.min(w, h);
             cropRect.set((w - cropRectRel.width() * baseViewSize) / 2,
                     (h - cropRectRel.height() * baseViewSize) / 2,
